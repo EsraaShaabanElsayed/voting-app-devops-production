@@ -1,3 +1,9 @@
-Flask
-Redis
-gunicorn
+# requirements.txt - Security-patched versions
+Flask==3.1.2
+redis==7.0.1
+gunicorn==23.0.0
+
+# Build tools with security patches
+pip>=25.3
+setuptools>=79.0.1
+wheel>=0.45.1
