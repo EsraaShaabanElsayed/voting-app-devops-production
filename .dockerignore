@@ -1,0 +1,12 @@
+.git
+.gitignore
+README.md
+*.excalidraw.png
+Dockerfile
+docker-compose.yml
+# Python specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python

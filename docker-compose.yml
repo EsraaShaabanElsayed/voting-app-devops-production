@@ -1,0 +1,44 @@
+services:
+  vote:
+    container_name: vote_container
+    build: ./vote
+    ports:
+      - 8080:8080
+    volumes:
+      - ./vote:/app
+
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - internal_network
+      - external_network
+
+  redis:
+    image: redis:alpine
+    container_name: redis-db
+    networks:
+      - internal_network
+    volumes:
+      - redis_data:/data
+      
+      - ./healthchecks/redis.sh:/healthchecks/redis.sh
+    healthcheck:
+      test: [CMD, sh, /healthchecks/redis.sh]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 40s
+
+networks:
+  internal_network:
+    driver: bridge
+    internal: true # No external internet access
+  external_network:
+    driver: bridge
+
+volumes:
+  redis_data:
