@@ -24,7 +24,7 @@ services:
       - internal_network
     volumes:
       - redis_data:/data
-      
+
       - ./healthchecks/redis.sh:/healthchecks/redis.sh
     healthcheck:
       test: [CMD, sh, /healthchecks/redis.sh]
@@ -69,6 +69,26 @@ services:
       timeout: 30s
       retries: 5
       start_period: 40s
+
+  worker:
+    container_name: worker_container
+    build: ./worker
+    ports:
+      - 8082:8082
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    networks:
+      - internal_network
 
 networks:
   internal_network:
