@@ -1,8 +1,7 @@
-FROM node:14-alpine AS base
+FROM node:22-alpine AS base
 
 # Update and upgrade Alpine packages
-RUN apk update && apk upgrade --no-cache && \
-     apk add --no-cache curl
+RUN apk update && apk upgrade --no-cache
 
 
 # Create app directory
@@ -12,11 +11,23 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --production && \
+RUN  npm ci --production  && \
     npm cache clean --force
 
+FROM node:22-alpine AS production
+# Set working directory
+WORKDIR /usr/src/app
 
-
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache curl && \
+    # Remove npm completely from the image
+    rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx \
+           /opt/yarn* \
+           ~/.npm
+# Copy node_modules from base image
+COPY --from=base /usr/src/app/node_modules ./node_modules
 # Copy app source
 COPY . .
 
