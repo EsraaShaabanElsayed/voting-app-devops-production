@@ -33,6 +33,43 @@ services:
       retries: 5
       start_period: 40s
 
+  result:
+    container_name: result_container
+    build: ./result
+    ports:
+      - 8081:8081
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db/postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    networks:
+      - internal_network
+      - external_network
+
+  db:
+    image: postgres:14-alpine
+    container_name: postgres
+    networks:
+      - internal_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./healthchecks/postgres.sh:/healthchecks/postgres.sh
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+    healthcheck:
+      test: [CMD, sh, /healthchecks/postgres.sh]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 40s
+
 networks:
   internal_network:
     driver: bridge
@@ -42,3 +79,4 @@ networks:
 
 volumes:
   redis_data:
+  postgres_data:

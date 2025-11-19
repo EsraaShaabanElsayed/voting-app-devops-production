@@ -10,3 +10,7 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+
+# Node.js specific
+node_modules/
+npm-debug.log
