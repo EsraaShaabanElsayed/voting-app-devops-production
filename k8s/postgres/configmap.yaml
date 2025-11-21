@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-healthcheck
+  namespace: voting-app
+data:
+  postgres.sh: |
+    #!/bin/sh
+    pg_isready -U $POSTGRES_USER -d $POSTGRES_DB

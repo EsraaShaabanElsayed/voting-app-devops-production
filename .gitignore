@@ -3,3 +3,6 @@ __pycache__/
 *$py.class
 .trunk/
 node_modules/
+terraform.tfstate
+terraform.tfstate.backup
+terraform/.terraform/
