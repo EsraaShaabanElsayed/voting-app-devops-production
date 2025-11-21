@@ -73,8 +73,6 @@ services:
   worker:
     container_name: worker_container
     build: ./worker
-    ports:
-      - 8082:8082
     depends_on:
       redis:
         condition: service_healthy
