@@ -4,5 +4,5 @@ metadata:
   name: vote-config
   namespace: voting-app
 data:
-  REDIS_HOST: redis
+  REDIS_HOST: redis-master #for the local files use  redis and redis-master for helm
   REDIS_PORT: "6379"

@@ -6,7 +6,8 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: redis
+     # app: redis #for the local files
+      kubernetes.io/instance: redis
   policyTypes:
   - Ingress
   ingress:
