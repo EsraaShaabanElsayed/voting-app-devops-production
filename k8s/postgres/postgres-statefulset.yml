@@ -7,7 +7,7 @@ metadata:
     app: postgres
     tier: backend
 spec:
-  serviceName: postgres
+  serviceName: db
   replicas: 1
   selector:
     matchLabels:
@@ -84,11 +84,11 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             failureThreshold: 3
-        volumes:
-          - name: healthcheck
-            configMap:
-                name: postgres-healthcheck
-                defaultMode: 755
+      volumes:
+        - name: healthcheck
+          configMap:
+              name: postgres-healthcheck
+              defaultMode: 0755
   volumeClaimTemplates:
   - metadata:
       name: postgres-data
