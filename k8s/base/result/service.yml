@@ -7,9 +7,13 @@ metadata:
     app: result
 spec:
   type: ClusterIP
+  sessionAffinity: ClientIP  # ✅ Ensures same client goes to same pod
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours
   ports:
-  - port: 80
-    targetPort: 8081
+  - port: 80        # Service port
+    targetPort: 8081 # Container port
     protocol: TCP
     name: http
   selector:

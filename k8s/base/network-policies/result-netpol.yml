@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: result-netpol
+  namespace: voting-app
+spec:
+  podSelector:
+    matchLabels:
+      app: result
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress-nginx to access vote pods
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx # Or app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8081 # Match container port
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    
+  # Allow DNS to kube-system
+    - to:
+      - namespaceSelector: {}
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
+      ports:
+      - protocol: UDP
+        port: 53
+      - protocol: TCP
+        port: 53
