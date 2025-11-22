@@ -1,123 +1,127 @@
-# Voting Application - DevOps Challenge
+# Voting App - Distributed Microservices Architecture
 
-## Project Overview
+![CI/CD Status](https://github.com/esraashaabanelsayed/voting-app-devops-production/actions/workflows/ci-cd.yml/badge.svg)
 
-This is a distributed voting application that allows users to vote between two options and view real-time results. The application consists of multiple microservices that work together to provide a complete voting experience.
+A cloud-native, distributed voting application built with a microservices architecture. This project demonstrates modern DevOps practices including containerization, orchestration with Kubernetes, and a complete CI/CD pipeline.
 
-## Application Architecture
+## 🏗️ Architecture
 
-The voting application consists of the following components:
+The application consists of five microservices working together:
 
 ![Architecture Diagram](./architecture.excalidraw.png)
 
-### Frontend Services
-- **Vote Service** (`/vote`): Python Flask web application that provides the voting interface
-- **Result Service** (`/result`): Node.js web application that displays real-time voting results
-
-### Backend Services  
-- **Worker Service** (`/worker`): .NET worker application that processes votes from the queue
-- **Redis**: Message broker that queues votes for processing
-- **PostgreSQL**: Database that stores the final vote counts
+| Service | Technology | Description |
+|---------|------------|-------------|
+| **Vote** | Python (Flask) | Frontend web app for users to cast votes. |
+| **Result** | Node.js | Frontend web app displaying real-time voting results. |
+| **Worker** | .NET | Background worker that consumes votes from Redis and stores them in PostgreSQL. |
+| **Redis** | Redis | In-memory message broker for queuing votes. |
+| **PostgreSQL** | PostgreSQL | Persistent database for storing vote counts. |
 
 ### Data Flow
-1. Users visit the vote service to cast their votes
-2. Votes are sent to Redis queue
-3. Worker service processes votes from Redis and stores them in PostgreSQL
-4. Result service queries PostgreSQL and displays real-time results via WebSocket
+1.  **User Interaction**: Users vote via the **Vote** app (Python).
+2.  **Queueing**: The vote is pushed to a **Redis** queue.
+3.  **Processing**: The **Worker** (.NET) consumes the vote from Redis.
+4.  **Storage**: The Worker persists the vote in **PostgreSQL**.
+5.  **Visualization**: The **Result** app (Node.js) fetches updated counts from DB and updates the UI in real-time.
 
-### Network Architecture
-The application should use a **two-tier network architecture** for security and organization:
+---
 
-- **Frontend Tier Network**: 
-  - Vote service (port 8080)
-  - Result service (port 8081)
-  - Accessible from outside the Docker environment
+## 🚀 Getting Started
 
-- **Backend Tier Network**:
-  - Worker service
-  - Redis
-  - PostgreSQL
-  - Internal communication only
+### Prerequisites
+- Docker & Docker Compose
+- Minikube (for Kubernetes deployment)
+- kubectl
 
-This separation ensures that database and message queue services are not directly accessible from outside, while the web services remain accessible to users.
+### Running Locally (Docker Compose)
 
-## Your Task
+The easiest way to run the application locally is using Docker Compose.
 
-As a DevOps engineer, your task is to containerize this application and create the necessary infrastructure files. You need to create:
+```bash
+# Clone the repository
+git clone https://github.com/esraashaabanelsayed/voting-app-devops-production.git
+cd voting-app-devops-production
 
-### 1. Docker Files
-Create `Dockerfile` for each service:
-- `vote/Dockerfile` - for the Python Flask application
-- `result/Dockerfile` - for the Node.js application  
-- `worker/Dockerfile` - for the .NET worker application
-- `seed-data/Dockerfile` - for the data seeding utility
+# Start the application
+docker compose up -d
+```
 
-### 2. Docker Compose
-Create `docker-compose.yml` that:
-- Defines all services with proper networking using **two-tier architecture**:
-  - **Frontend tier**: Vote and Result services (user-facing)
-  - **Backend tier**: Worker, Redis, and PostgreSQL (internal services)
-- Sets up health checks for Redis and PostgreSQL
-- Configures proper service dependencies
-- Exposes the vote service on port 8080 and result service on port 8081
-- Uses the provided health check scripts in `/healthchecks` directory
+Access the services:
+- **Vote App**: [http://localhost:8080](http://localhost:8080)
+- **Result App**: [http://localhost:8081](http://localhost:8081)
 
-### 3. Health Checks
-The application includes health check scripts:
-- `healthchecks/redis.sh` - Redis health check
-- `healthchecks/postgres.sh` - PostgreSQL health check
+### Deploying to Kubernetes (Minikube)
 
-Use these scripts in your Docker Compose configuration to ensure services are ready before dependent services start.
+To deploy the application to a local Kubernetes cluster:
 
-## Requirements
+1.  **Start Minikube**:
+    ```bash
+    minikube start --driver=docker
+    ```
 
-- All services should be properly networked using **two-tier architecture**:
-  - **Frontend tier network**: Connect Vote and Result services
-  - **Backend tier network**: Connect Worker, Redis, and PostgreSQL
-  - Both tiers should be isolated for security
-- Health checks must be implemented for Redis and PostgreSQL
-- Services should wait for their dependencies to be healthy before starting
-- The vote service should be accessible at `http://localhost:8080`
-- The result service should be accessible at `http://localhost:8081`
-- Use appropriate base images and follow Docker best practices
-- Ensure the application works end-to-end when running `docker compose up`
-- Include a seed service that can populate test data
+2.  **Deploy Resources**:
+    The project includes a comprehensive set of manifests in the `k8s/` directory.
 
-## Data Population
+    ```bash
+    # Apply all manifests
+    kubectl create namespace voting-app
+    kubectl apply -f k8s/base/namespace.yml
+    kubectl apply -f k8s/base/configmaps/ -n voting-app
+    kubectl apply -f k8s/base/secrets/ -n voting-app
+    
+    # Deploy databases (using Helm or manifests)
+    # ... (See CI/CD for Helm details, or use provided manifests if available)
+    
+    # Deploy Apps
+    kubectl apply -f k8s/base/vote/ -n voting-app
+    kubectl apply -f k8s/base/result/ -n voting-app
+    kubectl apply -f k8s/base/worker/ -n voting-app
+    ```
 
-The application includes a seed service (`/seed-data`) that can populate the database with test votes:
+3.  **Access the App**:
+    ```bash
+    minikube service vote -n voting-app
+    minikube service result -n voting-app
+    ```
 
-- **`make-data.py`**: Creates URL-encoded vote data files (`posta` and `postb`)
-- **`generate-votes.sh`**: Uses Apache Bench (ab) to send 3000 test votes:
-  - 2000 votes for option A
-  - 1000 votes for option B
+---
 
-### How to Use Seed Data
+## 🔄 CI/CD Pipeline
 
-1. Include the seed service in your `docker-compose.yml`
-2. Run the seed service after all other services are healthy:
-   ```bash
-   docker compose run --rm seed
-   ```
-3. Or run it as a one-time service with a profile:
-   ```bash
-   docker compose --profile seed up
-   ```
+This project uses **GitHub Actions** for Continuous Integration and Deployment.
 
-## Getting Started
+### Workflow: `ci-cd.yml`
 
-1. Examine the source code in each service directory
-2. Create the necessary Dockerfiles
-3. Create the docker-compose.yml file with two-tier networking
-4. Test your implementation by running `docker compose up`
-5. Populate test data using the seed service
-6. Verify that you can vote and see results in real-time
+The pipeline is triggered on pushes to the `main` branch and performs the following steps:
 
-## Notes
+1.  **Build & Push**:
+    - Builds Docker images for `vote`, `result`, and `worker` services.
+    - Pushes images to GitHub Container Registry (GHCR).
+    - Tags images with both `latest` and the Git SHA.
 
-- The voting application only accepts one vote per client browser
-- The result service uses WebSocket for real-time updates
-- The worker service continuously processes votes from the Redis queue
-- Make sure to handle service startup order properly with health checks
+2.  **Security Scanning**:
+    - Scans built images for vulnerabilities using **Trivy**.
+    - Uploads SARIF reports to GitHub Security.
 
-Good luck with your challenge! 🚀
+3.  **Deploy to Minikube (Integration Test)**:
+    - Spins up a Minikube cluster inside the GitHub Runner.
+    - Deploys the application using the newly built images (injecting the specific SHA).
+    - Verifies deployment stability using `kubectl wait`.
+
+4.  **Smoke Tests**:
+    - Runs connectivity tests to ensure the Vote and Result services are accessible.
+
+---
+
+## 🛠️ Technologies
+
+- **Containerization**: Docker
+- **Orchestration**: Kubernetes (K8s)
+- **CI/CD**: GitHub Actions
+- **Infrastructure as Code**: Terraform (planned/included in `terraform/`)
+- **Languages**: Python, Node.js, C# (.NET), Shell
+
+## 📜 License
+
+This project is open source and available under the [MIT License](LICENSE).
