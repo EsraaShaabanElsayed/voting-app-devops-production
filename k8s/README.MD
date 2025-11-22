@@ -239,6 +239,51 @@ echo "cG9zdGdyZXM=" | base64 -d
 - **Does NOT use DATABASE_URL** - Uses parameters for connection pooling
 
 
+#### 7. Redis StatefulSet (`k8s/redis/`)
+
+**Why StatefulSet over Deployment?**
+
+| Feature | StatefulSet | Deployment |
+|---------|-------------|------------|
+| **Pod Names** | Stable (redis-0) | Random (redis-7f8d9-abc12) |
+| **Storage** | Persistent per pod | Ephemeral or shared |
+| **Ordering** | Sequential start/stop | Parallel |
+| **Network Identity** | Stable DNS | Changes on restart |
+| **Use Case** | Databases, queues | Stateless apps |
+
+
+**Key Configuration:**
+- **Persistence enabled** - AOF (Append-Only File) for durability
+- **Save policy** - Snapshot if 1 key changes in 60 seconds
+- **Health checks** - Custom script using redis-cli
+- **2Gi storage** - Sufficient for vote queue/cache
+- **UID 999** - Default redis user in alpine image
+
+**Headless Service (`clusterIP: None`):**
+- Provides stable DNS: `redis-0.redis.voting-app.svc.cluster.local`
+- No load balancing (direct pod access)
+- Required for StatefulSet network identity
+
+
+
+#### 8. PostgreSQL StatefulSet (`k8s/postgres/`)
+
+**Service Name: `db`** - Matches Docker Compose for application compatibility
+
+**statefulset.yml:**
+
+
+**Key Configuration:**
+- **PGDATA custom path** - Required for proper permissions with fsGroup
+- **5Gi storage** - Adequate for application data
+- **UID 999** - Default postgres user in alpine image
+- **Health checks** - SQL query execution test
+
+**service.yml:**
+
+**configmap.yml (Health Check):**
+
+
 #### 9. Ingress (`base/ingress.yml`)
 
 **Purpose:** Expose vote and result services to external traffic
@@ -641,26 +686,3 @@ open http://result.com
 ---
 
 
-
-#### Issue 2: PSA Violations
-
-**Symptoms:**
-```bash
-Error from server (Forbidden): error when creating "deployment.yml": 
-pods "vote-xxx" is forbidden: violates PodSecurity "restricted:latest"
-```
-
-**Solutions:**
-```bash
-# Check security context
-kubectl get deployment vote -n voting-app -o yaml | grep -A 10 securityContext
-
-# Ensure all requirements met:
-# - runAsNonRoot: true
-# - runAsUser: 1000 (non-root UID)
-# - capabilities dropped
-# - seccompProfile set
-
-# Temporarily relax PSA for debugging (NOT for production)
-kubectl label namespace voting-app pod-security.kubernetes.io/enforce=baseline --overwrite
-```
