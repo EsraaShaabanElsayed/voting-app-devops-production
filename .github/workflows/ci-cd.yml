@@ -175,7 +175,7 @@ jobs:
 
           # Test Vote service
           echo "Testing Vote service..."
-          if curl -f -s http://$MINIKUBE_IP -H "Host: vote.local" > /dev/null; then
+          if curl -f -s http://$MINIKUBE_IP -H "Host: vote.com" > /dev/null; then
             echo "Vote service is accessible"
           else
             echo "Vote service is not accessible"
@@ -184,7 +184,7 @@ jobs:
 
           # Test Result service
           echo "Testing Result service..."
-          if curl -f -s http://$MINIKUBE_IP -H "Host: result.local" > /dev/null; then
+          if curl -f -s http://$MINIKUBE_IP -H "Host: result.com" > /dev/null; then
             echo "Result service is accessible"
           else
             echo "Result service is not accessible"
@@ -199,11 +199,11 @@ jobs:
           MINIKUBE_IP=$(minikube ip)
           echo "DEPLOYMENT SUCCESSFUL!"
           echo "Your application is running at:"
-          echo "Vote:   http://vote.local"
-          echo "Result: http://result.local"
+          echo "Vote:   http://vote.com"
+          echo "Result: http://result.com"
           echo ""
           echo "To access from your local machine, add to /etc/hosts:"
-          echo "$MINIKUBE_IP vote.local result.local"
+          echo "$MINIKUBE_IP vote.com result.com"
           echo ""
           echo "Check status with: kubectl get all -n voting-app"
 
