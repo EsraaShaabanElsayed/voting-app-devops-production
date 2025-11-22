@@ -16,11 +16,11 @@ jobs:
       contents: read
       packages: write
       security-events: write
-    
+
     strategy:
       matrix:
         service: [vote, result, worker]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,25 +47,25 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Security scan ${{ matrix.service }}
-        if: success()  # Only run if build was successful
+        if: success() # Only run if build was successful
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
-          format: 'sarif'
-          output: 'trivy-results-${{ matrix.service }}.sarif'
-          severity: 'CRITICAL,HIGH'
+          format: "sarif"
+          output: "trivy-results-${{ matrix.service }}.sarif"
+          severity: "CRITICAL,HIGH"
 
       - name: Upload security results
-        if: success()  # Only run if build was successful
+        if: success() # Only run if build was successful
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+          sarif_file: "trivy-results-${{ matrix.service }}.sarif"
 
   deploy-to-minikube:
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
         uses: medyagh/setup-minikube@master
         with:
           driver: docker
-          kubernetes-version: 'v1.28.0'
+          kubernetes-version: "v1.28.0"
 
       - name: Start Minikube cluster
         run: |
@@ -90,27 +90,32 @@ jobs:
         run: |
           # Create namespace if it doesn't exist
           kubectl create namespace voting-app --dry-run=client -o yaml | kubectl apply -f -
-          
+
+          echo "Updating image tags in manifests..."
+          sed -i "s/:latest/:${{ github.sha }}/g" k8s/base/vote/deployment.yml
+          sed -i "s/:latest/:${{ github.sha }}/g" k8s/base/result/deployment.yml
+          sed -i "s/:latest/:${{ github.sha }}/g" k8s/base/worker/deployment.yml
+
           echo "Applying Kubernetes manifests..."
-          
+
           # Apply base configurations
           kubectl apply -f k8s/base/namespace.yml
           kubectl apply -f k8s/base/configmaps/ -n voting-app
           kubectl apply -f k8s/base/secrets/ -n voting-app
-          
+
           echo "Deploying databases with Helm..."
-          
+
           # Add Bitnami Helm repository
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo update
-          
+
           # Deploy Redis
           helm upgrade --install redis bitnami/redis -n voting-app \
             --set auth.enabled=false \
             --set architecture=standalone \
             --set fullnameOverride=redis \
             --set master.persistence.size=2Gi
-          
+
           # Deploy PostgreSQL
           helm upgrade --install postgres bitnami/postgresql -n voting-app \
             --set auth.username=postgres \
@@ -118,20 +123,20 @@ jobs:
             --set auth.database=postgres \
             --set fullnameOverride=db \
             --set primary.persistence.size=5Gi
-          
+
           echo "Waiting for databases to be ready..."
           kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis -n voting-app --timeout=180s
           kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql -n voting-app --timeout=180s
-          
+
           echo "Deploying application services..."
           # Deploy application services
           kubectl apply -f k8s/base/vote/ -n voting-app
           kubectl apply -f k8s/base/result/ -n voting-app
           kubectl apply -f k8s/base/worker/ -n voting-app
-          
+
           echo "Applying network policies..."
           kubectl apply -f k8s/base/network-policies/ -n voting-app
-          
+
           echo "Deploying ingress..."
           kubectl apply -f k8s/base/ingress.yml -n voting-app
 
@@ -147,15 +152,15 @@ jobs:
         run: |
           echo "=== DEPLOYMENT STATUS ==="
           kubectl get all -n voting-app
-          
+
           echo ""
           echo "=== SERVICES ==="
           kubectl get services -n voting-app
-          
+
           echo ""
           echo "=== INGRESS ==="
           kubectl get ingress -n voting-app
-          
+
           echo ""
           echo "=== POD STATUS ==="
           kubectl get pods -n voting-app -o wide
@@ -165,9 +170,9 @@ jobs:
           # Get Minikube IP address
           MINIKUBE_IP=$(minikube ip)
           echo "Minikube IP: $MINIKUBE_IP"
-          
+
           echo "Testing application connectivity..."
-          
+
           # Test Vote service
           echo "Testing Vote service..."
           if curl -f -s http://$MINIKUBE_IP -H "Host: vote.local" > /dev/null; then
@@ -176,7 +181,7 @@ jobs:
             echo "Vote service is not accessible"
             exit 1
           fi
-          
+
           # Test Result service
           echo "Testing Result service..."
           if curl -f -s http://$MINIKUBE_IP -H "Host: result.local" > /dev/null; then
@@ -185,7 +190,7 @@ jobs:
             echo "Result service is not accessible"
             exit 1
           fi
-          
+
           echo "All smoke tests passed!"
 
       - name: Deployment successful
@@ -206,7 +211,7 @@ jobs:
     needs: deploy-to-minikube
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
       - name: Cleanup Minikube
         run: |
