@@ -1,7 +1,3 @@
-
-# Voting Application - Cloud-Native Microservices Platform
-A production-ready distributed voting application demonstrating enterprise-grade containerization, Kubernetes orchestration, CI/CD automation, and comprehensive security practices.
-
 ![alt text](<Screenshot from 2025-11-22 22-25-34.png>)
 
 [![CI/CD](https://github.com/esraashaabanelsayed/voting-app-devops-production/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/esraashaabanelsayed/voting-app-devops-production/actions)
@@ -11,6 +7,10 @@ A production-ready distributed voting application demonstrating enterprise-grade
 [![Security](https://img.shields.io/badge/Security-PSA%20Restricted-success)](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
 
 ![CI/CD Status](https://github.com/esraashaabanelsayed/voting-app-devops-production/actions/workflows/ci-cd.yml/badge.svg)
+# Voting Application - Cloud-Native Microservices Platform
+A production-ready distributed voting application demonstrating enterprise-grade containerization, Kubernetes orchestration, CI/CD automation, and comprehensive security practices.
+
+
 
 
 ---
