@@ -1,0 +1,215 @@
+name: Voting App CI/CD with Minikube
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    
+    strategy:
+      matrix:
+        service: [vote, result, worker]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Security scan ${{ matrix.service }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload security results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+
+  deploy-to-minikube:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Minikube
+        uses: medyagh/setup-minikube@master
+        with:
+          driver: docker
+          kubernetes-version: 'v1.28.0'
+
+      - name: Start Minikube cluster
+        run: |
+          minikube start \
+            --driver=docker \
+            --cpus=2 \
+            --memory=4000 \
+            --disk-size=10g
+          minikube addons enable ingress
+          minikube status
+
+      - name: Deploy application
+        run: |
+          # Create namespace if it doesn't exist
+          kubectl create namespace voting-app --dry-run=client -o yaml | kubectl apply -f -
+          
+          echo "Applying Kubernetes manifests..."
+          
+          # Apply base configurations
+          kubectl apply -f k8s/base/namespace.yml
+          kubectl apply -f k8s/base/configmaps/ -n voting-app
+          kubectl apply -f k8s/base/secrets/ -n voting-app
+          
+          echo "Deploying databases with Helm..."
+          
+          # Add Bitnami Helm repository
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
+          
+          # Deploy Redis
+          helm upgrade --install redis bitnami/redis -n voting-app \
+            --set auth.enabled=false \
+            --set architecture=standalone \
+            --set fullnameOverride=redis \
+            --set master.persistence.size=2Gi
+          
+          # Deploy PostgreSQL
+          helm upgrade --install postgres bitnami/postgresql -n voting-app \
+            --set auth.username=postgres \
+            --set auth.password=postgres \
+            --set auth.database=postgres \
+            --set fullnameOverride=db \
+            --set primary.persistence.size=5Gi
+          
+          echo "Waiting for databases to be ready..."
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis -n voting-app --timeout=180s
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql -n voting-app --timeout=180s
+          
+          echo "Deploying application services..."
+          # Deploy application services
+          kubectl apply -f k8s/base/vote/ -n voting-app
+          kubectl apply -f k8s/base/result/ -n voting-app
+          kubectl apply -f k8s/base/worker/ -n voting-app
+          
+          echo "Applying network policies..."
+          kubectl apply -f k8s/base/network-policies/ -n voting-app
+          
+          echo "Deploying ingress..."
+          kubectl apply -f k8s/base/ingress.yml -n voting-app
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for all pods to be ready..."
+          kubectl wait --for=condition=ready pod -l app=vote -n voting-app --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=result -n voting-app --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=worker -n voting-app --timeout=300s
+          echo "All pods are ready!"
+
+      - name: Verify deployment
+        run: |
+          echo "=== DEPLOYMENT STATUS ==="
+          kubectl get all -n voting-app
+          
+          echo ""
+          echo "=== SERVICES ==="
+          kubectl get services -n voting-app
+          
+          echo ""
+          echo "=== INGRESS ==="
+          kubectl get ingress -n voting-app
+          
+          echo ""
+          echo "=== POD STATUS ==="
+          kubectl get pods -n voting-app -o wide
+
+      - name: Run smoke tests
+        run: |
+          # Get Minikube IP address
+          MINIKUBE_IP=$(minikube ip)
+          echo "Minikube IP: $MINIKUBE_IP"
+          
+          echo "Testing application connectivity..."
+          
+          # Test Vote service
+          echo "Testing Vote service..."
+          if curl -f -s http://$MINIKUBE_IP -H "Host: vote.local" > /dev/null; then
+            echo "Vote service is accessible"
+          else
+            echo "Vote service is not accessible"
+            exit 1
+          fi
+          
+          # Test Result service
+          echo "Testing Result service..."
+          if curl -f -s http://$MINIKUBE_IP -H "Host: result.local" > /dev/null; then
+            echo "Result service is accessible"
+          else
+            echo "Result service is not accessible"
+            exit 1
+          fi
+          
+          echo "All smoke tests passed!"
+
+      - name: Deployment successful
+        if: success()
+        run: |
+          MINIKUBE_IP=$(minikube ip)
+          echo "DEPLOYMENT SUCCESSFUL!"
+          echo "Your application is running at:"
+          echo "Vote:   http://vote.local"
+          echo "Result: http://result.local"
+          echo ""
+          echo "To access from your local machine, add to /etc/hosts:"
+          echo "$MINIKUBE_IP vote.local result.local"
+          echo ""
+          echo "Check status with: kubectl get all -n voting-app"
+
+  cleanup:
+    needs: deploy-to-minikube
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Cleanup Minikube
+        run: |
+          # Stop Minikube to free resources
+          minikube stop || true
+          echo "Cleanup completed"
